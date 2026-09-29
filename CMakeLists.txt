@@ -40,6 +40,7 @@ add_library(sysmon_core STATIC
     src/CpuMonitor.cpp
     src/MemoryMonitor.cpp
     src/DiskMonitor.cpp
+    src/ProcessMonitor.cpp
     src/SystemMonitor.cpp
 )
 target_include_directories(sysmon_core PUBLIC include)

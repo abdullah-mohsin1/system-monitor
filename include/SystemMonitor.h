@@ -3,9 +3,12 @@
 #include "CpuMonitor.h"
 #include "DiskMonitor.h"
 #include "MemoryMonitor.h"
+#include "ProcessMonitor.h"
 
+#include <cstddef>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace sysmon {
 
@@ -30,12 +33,19 @@ public:
     std::optional<DiskStats> disk() const { return diskMonitor_.sample(); }
     std::optional<double> uptimeSeconds() const;
 
+    std::optional<std::vector<ProcessInfo>> processes(size_t limit = ProcessMonitor::kDefaultLimit) {
+        return processMonitor_.sample(limit);
+    }
+
     Snapshot snapshot();
 
 private:
-    CpuMonitor cpuMonitor_;  // stateful and thread-safe in its own right
+    // CpuMonitor and ProcessMonitor keep the previous sample and guard it with
+    // their own mutex, so SystemMonitor needs no locking of its own.
+    CpuMonitor cpuMonitor_;
     MemoryMonitor memoryMonitor_;
     DiskMonitor diskMonitor_;
+    ProcessMonitor processMonitor_;
 };
 
 }  // namespace sysmon

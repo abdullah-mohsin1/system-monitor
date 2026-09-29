@@ -3,7 +3,9 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -17,6 +19,7 @@ namespace {
 
 constexpr int kDefaultPort = 8080;
 constexpr const char* kBindAddress = "0.0.0.0";
+constexpr size_t kMaxProcessLimit = 500;
 
 struct Options {
     int port = kDefaultPort;
@@ -95,6 +98,13 @@ json toJson(const sysmon::MemoryStats& memory) {
                 {"usagePercent", roundToTenth(memory.usagePercent)}};
 }
 
+json toJson(const sysmon::ProcessInfo& process) {
+    return json{{"pid", process.pid},
+                {"name", process.name},
+                {"cpuPercent", roundToTenth(process.cpuPercent)},
+                {"memoryBytes", process.memoryBytes}};
+}
+
 json toJson(const sysmon::DiskStats& disk) {
     return json{{"totalBytes", disk.totalBytes},
                 {"usedBytes", disk.usedBytes},
@@ -109,6 +119,19 @@ void respondJson(httplib::Response& res, const json& body, int status = 200) {
 
 void respondUnavailable(httplib::Response& res, const std::string& metric) {
     respondJson(res, json{{"error", metric + " metrics are unavailable on this system"}}, 503);
+}
+
+// Reads an optional positive "limit" query parameter, clamped so a caller
+// cannot ask the server to serialise every process on the machine.
+size_t parseLimit(const httplib::Request& req, size_t fallback) {
+    if (!req.has_param("limit")) {
+        return fallback;
+    }
+    const long requested = std::strtol(req.get_param_value("limit").c_str(), nullptr, 10);
+    if (requested <= 0) {
+        return fallback;
+    }
+    return std::min<size_t>(static_cast<size_t>(requested), kMaxProcessLimit);
 }
 
 void registerRoutes(httplib::Server& server, sysmon::SystemMonitor& monitor) {
@@ -138,6 +161,21 @@ void registerRoutes(httplib::Server& server, sysmon::SystemMonitor& monitor) {
         } else {
             respondUnavailable(res, "Disk");
         }
+    });
+
+    server.Get("/api/processes", [&monitor](const httplib::Request& req, httplib::Response& res) {
+        const size_t limit = parseLimit(req, sysmon::ProcessMonitor::kDefaultLimit);
+        const auto processes = monitor.processes(limit);
+        if (!processes) {
+            respondUnavailable(res, "Process");
+            return;
+        }
+
+        json body = json::array();
+        for (const sysmon::ProcessInfo& process : *processes) {
+            body.push_back(toJson(process));
+        }
+        respondJson(res, body);
     });
 
     server.Get("/api/system", [&monitor](const httplib::Request&, httplib::Response& res) {
