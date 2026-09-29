@@ -2,9 +2,88 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>System Monitor</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <p>Dashboard placeholder &mdash; see /api/health</p>
+    <header class="topbar">
+        <h1>System Monitor</h1>
+        <div class="status" id="status" data-state="pending">
+            <span class="status-dot"></span>
+            <span id="statusText">Connecting</span>
+        </div>
+    </header>
+
+    <dl class="meta">
+        <div><dt>Cores</dt><dd id="metaCores">&mdash;</dd></div>
+        <div><dt>Uptime</dt><dd id="metaUptime">&mdash;</dd></div>
+        <div><dt>Updated</dt><dd id="metaUpdated">&mdash;</dd></div>
+    </dl>
+
+    <section class="cards" aria-label="Current utilisation">
+        <article class="card">
+            <h2>CPU</h2>
+            <p class="value" id="cpuValue">&mdash;</p>
+            <p class="detail" id="cpuDetail">&nbsp;</p>
+            <div class="bar"><div class="bar-fill" id="cpuBar"></div></div>
+        </article>
+        <article class="card">
+            <h2>Memory</h2>
+            <p class="value" id="memoryValue">&mdash;</p>
+            <p class="detail" id="memoryDetail">&nbsp;</p>
+            <div class="bar"><div class="bar-fill" id="memoryBar"></div></div>
+        </article>
+        <article class="card">
+            <h2>Disk</h2>
+            <p class="value" id="diskValue">&mdash;</p>
+            <p class="detail" id="diskDetail">&nbsp;</p>
+            <div class="bar"><div class="bar-fill" id="diskBar"></div></div>
+        </article>
+    </section>
+
+    <section class="charts" id="charts">
+        <article class="panel chart-panel">
+            <div class="panel-head">
+                <h2>CPU history</h2>
+                <span class="hint">last 60 samples</span>
+            </div>
+            <div class="chart-wrap"><canvas id="cpuChart" aria-label="CPU usage over time"></canvas></div>
+        </article>
+        <article class="panel chart-panel">
+            <div class="panel-head">
+                <h2>Memory history</h2>
+                <span class="hint">last 60 samples</span>
+            </div>
+            <div class="chart-wrap"><canvas id="memoryChart" aria-label="Memory usage over time"></canvas></div>
+        </article>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Running processes</h2>
+            <input type="search" id="processSearch" placeholder="Filter by name or PID" aria-label="Filter processes">
+        </div>
+        <table class="processes">
+            <thead>
+                <tr>
+                    <th scope="col" class="num">PID</th>
+                    <th scope="col">Process</th>
+                    <th scope="col" class="num">CPU</th>
+                    <th scope="col" class="num">Memory</th>
+                </tr>
+            </thead>
+            <tbody id="processBody">
+                <tr class="empty"><td colspan="4">Loading processes</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Charts are a nicety: if the CDN is unreachable the dashboard drops them
+         and keeps working. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+            integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD"
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="app.js"></script>
 </body>
 </html>
