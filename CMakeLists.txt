@@ -9,6 +9,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# Use the extraction timestamp for fetched archives so a changed URL rebuilds.
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 include(FetchContent)
 
 # Header-only dependencies are fetched at configure time so a fresh clone needs
@@ -28,13 +33,25 @@ FetchContent_MakeAvailable(httplib nlohmann_json)
 
 find_package(Threads REQUIRED)
 
-add_executable(system_monitor
-    src/main.cpp
+# The monitoring code is a library so that the tests can link against it
+# without pulling in the HTTP server. It deliberately knows nothing about JSON.
+add_library(sysmon_core STATIC
+    src/ProcFs.cpp
+    src/CpuMonitor.cpp
+    src/MemoryMonitor.cpp
+    src/DiskMonitor.cpp
+    src/SystemMonitor.cpp
 )
-target_include_directories(system_monitor PRIVATE include)
+target_include_directories(sysmon_core PUBLIC include)
+target_link_libraries(sysmon_core PUBLIC Threads::Threads)
+
+add_executable(system_monitor src/main.cpp)
 target_link_libraries(system_monitor PRIVATE
+    sysmon_core
     httplib::httplib
     nlohmann_json::nlohmann_json
-    Threads::Threads
 )
-target_compile_options(system_monitor PRIVATE -Wall -Wextra -Wpedantic)
+
+foreach(target sysmon_core system_monitor)
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+endforeach()

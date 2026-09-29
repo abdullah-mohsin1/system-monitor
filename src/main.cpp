@@ -1,6 +1,9 @@
+#include "SystemMonitor.h"
+
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -71,9 +74,86 @@ std::string locateClientDir(const char* programPath) {
     return {};
 }
 
-void registerRoutes(httplib::Server& server) {
+// Percentages are rounded before serialisation; a dashboard has no use for the
+// full double and it keeps the JSON readable.
+double roundToTenth(double value) { return std::round(value * 10.0) / 10.0; }
+
+json toJson(const sysmon::CpuStats& cpu) {
+    json perCore = json::array();
+    for (const double usage : cpu.perCoreUsagePercent) {
+        perCore.push_back(roundToTenth(usage));
+    }
+    return json{{"usagePercent", roundToTenth(cpu.usagePercent)},
+                {"coreCount", cpu.coreCount},
+                {"perCoreUsagePercent", perCore}};
+}
+
+json toJson(const sysmon::MemoryStats& memory) {
+    return json{{"totalBytes", memory.totalBytes},
+                {"usedBytes", memory.usedBytes},
+                {"availableBytes", memory.availableBytes},
+                {"usagePercent", roundToTenth(memory.usagePercent)}};
+}
+
+json toJson(const sysmon::DiskStats& disk) {
+    return json{{"totalBytes", disk.totalBytes},
+                {"usedBytes", disk.usedBytes},
+                {"freeBytes", disk.freeBytes},
+                {"usagePercent", roundToTenth(disk.usagePercent)}};
+}
+
+void respondJson(httplib::Response& res, const json& body, int status = 200) {
+    res.status = status;
+    res.set_content(body.dump(), "application/json");
+}
+
+void respondUnavailable(httplib::Response& res, const std::string& metric) {
+    respondJson(res, json{{"error", metric + " metrics are unavailable on this system"}}, 503);
+}
+
+void registerRoutes(httplib::Server& server, sysmon::SystemMonitor& monitor) {
     server.Get("/api/health", [](const httplib::Request&, httplib::Response& res) {
-        res.set_content(json{{"status", "ok"}}.dump(), "application/json");
+        respondJson(res, json{{"status", "ok"}});
+    });
+
+    server.Get("/api/cpu", [&monitor](const httplib::Request&, httplib::Response& res) {
+        if (const auto cpu = monitor.cpu()) {
+            respondJson(res, toJson(*cpu));
+        } else {
+            respondUnavailable(res, "CPU");
+        }
+    });
+
+    server.Get("/api/memory", [&monitor](const httplib::Request&, httplib::Response& res) {
+        if (const auto memory = monitor.memory()) {
+            respondJson(res, toJson(*memory));
+        } else {
+            respondUnavailable(res, "Memory");
+        }
+    });
+
+    server.Get("/api/disk", [&monitor](const httplib::Request&, httplib::Response& res) {
+        if (const auto disk = monitor.disk()) {
+            respondJson(res, toJson(*disk));
+        } else {
+            respondUnavailable(res, "Disk");
+        }
+    });
+
+    server.Get("/api/system", [&monitor](const httplib::Request&, httplib::Response& res) {
+        const sysmon::SystemMonitor::Snapshot snapshot = monitor.snapshot();
+        if (!snapshot.cpu && !snapshot.memory && !snapshot.disk && !snapshot.uptimeSeconds) {
+            respondUnavailable(res, "System");
+            return;
+        }
+
+        json body;
+        body["cpu"] = snapshot.cpu ? toJson(*snapshot.cpu) : json(nullptr);
+        body["memory"] = snapshot.memory ? toJson(*snapshot.memory) : json(nullptr);
+        body["disk"] = snapshot.disk ? toJson(*snapshot.disk) : json(nullptr);
+        body["uptimeSeconds"] =
+            snapshot.uptimeSeconds ? json(std::llround(*snapshot.uptimeSeconds)) : json(nullptr);
+        respondJson(res, body);
     });
 }
 
@@ -85,8 +165,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    sysmon::SystemMonitor monitor;
     httplib::Server server;
-    registerRoutes(server);
+    registerRoutes(server, monitor);
 
     const std::string clientDir =
         options.clientDir.empty() ? locateClientDir(argv[0]) : options.clientDir;
@@ -103,8 +184,7 @@ int main(int argc, char** argv) {
         });
 
     // Flushed explicitly so the banner appears immediately when stdout is a pipe.
-    std::cout << "System Monitor running on http://localhost:" << options.port
-              << std::endl;
+    std::cout << "System Monitor running on http://localhost:" << options.port << std::endl;
     if (!server.listen(kBindAddress, options.port)) {
         std::cerr << "Failed to bind port " << options.port << "\n";
         return 1;
