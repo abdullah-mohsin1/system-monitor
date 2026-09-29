@@ -24,6 +24,9 @@ FetchContent_Declare(httplib
 FetchContent_Declare(nlohmann_json
     URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
 )
+FetchContent_Declare(doctest
+    URL https://github.com/doctest/doctest/archive/refs/tags/v2.4.11.tar.gz
+)
 
 set(HTTPLIB_REQUIRE_OPENSSL OFF CACHE BOOL "" FORCE)
 set(HTTPLIB_REQUIRE_ZLIB OFF CACHE BOOL "" FORCE)
@@ -56,3 +59,16 @@ target_link_libraries(system_monitor PRIVATE
 foreach(target sysmon_core system_monitor)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
 endforeach()
+
+option(SYSMON_BUILD_TESTS "Build the unit tests" ON)
+
+if(SYSMON_BUILD_TESTS)
+    enable_testing()
+    FetchContent_MakeAvailable(doctest)
+
+    add_executable(sysmon_tests tests/test_parsing.cpp)
+    target_link_libraries(sysmon_tests PRIVATE sysmon_core doctest::doctest)
+    target_compile_options(sysmon_tests PRIVATE -Wall -Wextra -Wpedantic)
+
+    add_test(NAME parsing COMMAND sysmon_tests)
+endif()
