@@ -147,6 +147,29 @@ h2 {
 .bar-fill[data-level="warn"] { background: var(--warn); }
 .bar-fill[data-level="crit"] { background: var(--crit); }
 
+.cores {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px 24px;
+    padding: 16px 18px;
+}
+
+.core {
+    display: grid;
+    grid-template-columns: 54px 1fr 44px;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+}
+
+.core-label { color: var(--text-dim); }
+
+.core-value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 .charts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -200,6 +223,10 @@ h2 {
     outline-offset: -1px;
 }
 
+/* Process rows do not wrap, so on a narrow screen the table scrolls sideways
+   inside the panel rather than stretching the page. */
+.table-scroll { overflow-x: auto; }
+
 .processes {
     width: 100%;
     border-collapse: collapse;
@@ -231,6 +258,30 @@ h2 {
     max-width: 320px;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.processes th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.processes th.sortable:hover { color: var(--text); }
+
+/* The caret is reserved on every sortable header so the row does not shift
+   when the sort column changes. */
+.processes th.sortable::after {
+    content: "\2195";
+    margin-left: 6px;
+    opacity: 0.25;
+}
+
+.processes th[aria-sort="ascending"]::after { content: "\2191"; opacity: 1; }
+.processes th[aria-sort="descending"]::after { content: "\2193"; opacity: 1; }
+.processes th[aria-sort] { color: var(--text); }
+
+.processes th.sortable:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 
 .processes tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }

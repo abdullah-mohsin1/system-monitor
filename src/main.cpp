@@ -98,6 +98,12 @@ json toJson(const sysmon::MemoryStats& memory) {
                 {"usagePercent", roundToTenth(memory.usagePercent)}};
 }
 
+json toJson(const sysmon::HostInfo& host) {
+    return json{{"hostname", host.hostname},
+                {"kernelVersion", host.kernelVersion},
+                {"architecture", host.architecture}};
+}
+
 json toJson(const sysmon::ProcessInfo& process) {
     return json{{"pid", process.pid},
                 {"name", process.name},
@@ -189,6 +195,7 @@ void registerRoutes(httplib::Server& server, sysmon::SystemMonitor& monitor) {
         body["cpu"] = snapshot.cpu ? toJson(*snapshot.cpu) : json(nullptr);
         body["memory"] = snapshot.memory ? toJson(*snapshot.memory) : json(nullptr);
         body["disk"] = snapshot.disk ? toJson(*snapshot.disk) : json(nullptr);
+        body["host"] = monitor.host() ? toJson(*monitor.host()) : json(nullptr);
         body["uptimeSeconds"] =
             snapshot.uptimeSeconds ? json(std::llround(*snapshot.uptimeSeconds)) : json(nullptr);
         respondJson(res, body);

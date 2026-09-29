@@ -11,12 +11,18 @@ const CRIT_PERCENT = 90;
 const elements = {
     status: document.getElementById('status'),
     statusText: document.getElementById('statusText'),
+    metaHost: document.getElementById('metaHost'),
+    metaKernel: document.getElementById('metaKernel'),
+    metaArch: document.getElementById('metaArch'),
     metaCores: document.getElementById('metaCores'),
     metaUptime: document.getElementById('metaUptime'),
     metaUpdated: document.getElementById('metaUpdated'),
     processBody: document.getElementById('processBody'),
     processSearch: document.getElementById('processSearch'),
     charts: document.getElementById('charts'),
+    coresPanel: document.getElementById('coresPanel'),
+    cores: document.getElementById('cores'),
+    processHead: document.getElementById('processHead'),
 };
 
 // The most recent process list is kept so filtering does not need a new request.
@@ -24,6 +30,12 @@ let latestProcesses = [];
 
 // History lives only in memory: reloading the page starts the graphs over.
 const charts = { cpu: null, memory: null };
+
+const sort = { key: 'cpuPercent', ascending: false };
+
+// Core rows are built once and then updated in place, so the DOM is not
+// rebuilt every second.
+const coreRows = [];
 
 /* ---------- formatting ---------- */
 
@@ -89,11 +101,69 @@ function updateCard(prefix, percent, detail) {
     bar.dataset.level = levelFor(percent);
 }
 
+function buildCoreRows(count) {
+    elements.cores.replaceChildren();
+    coreRows.length = 0;
+
+    for (let core = 0; core < count; core += 1) {
+        const row = document.createElement('div');
+        row.className = 'core';
+
+        const label = document.createElement('span');
+        label.className = 'core-label';
+        label.textContent = `Core ${core}`;
+
+        const track = document.createElement('div');
+        track.className = 'bar';
+        const fill = document.createElement('div');
+        fill.className = 'bar-fill';
+        track.append(fill);
+
+        const value = document.createElement('span');
+        value.className = 'core-value';
+        value.textContent = '—';
+
+        row.append(label, track, value);
+        elements.cores.append(row);
+        coreRows.push({ fill, value });
+    }
+
+    elements.coresPanel.hidden = count === 0;
+}
+
+function renderCores(perCorePercentages) {
+    if (!Array.isArray(perCorePercentages)) {
+        return;
+    }
+    if (perCorePercentages.length !== coreRows.length) {
+        buildCoreRows(perCorePercentages.length);
+    }
+
+    perCorePercentages.forEach((percent, index) => {
+        const row = coreRows[index];
+        row.fill.style.width = `${Math.min(Math.max(percent, 0), 100)}%`;
+        row.fill.dataset.level = levelFor(percent);
+        row.value.textContent = `${Math.round(percent)}%`;
+    });
+}
+
+function renderHost(host) {
+    if (!host) {
+        return;
+    }
+    elements.metaHost.textContent = host.hostname;
+    elements.metaKernel.textContent = host.kernelVersion;
+    elements.metaArch.textContent = host.architecture;
+}
+
 function renderSystem(system) {
     if (system.cpu) {
         updateCard('cpu', system.cpu.usagePercent, `${system.cpu.coreCount} cores`);
         elements.metaCores.textContent = system.cpu.coreCount;
+        renderCores(system.cpu.perCoreUsagePercent);
     }
+
+    renderHost(system.host);
 
     if (system.memory) {
         const { usedBytes, totalBytes, usagePercent } = system.memory;
@@ -120,14 +190,22 @@ function renderSystem(system) {
     elements.metaUpdated.textContent = timeLabel;
 }
 
+function compareProcesses(a, b) {
+    const left = a[sort.key];
+    const right = b[sort.key];
+    const order = typeof left === 'string' ? left.localeCompare(right) : left - right;
+    return sort.ascending ? order : -order;
+}
+
 function renderProcesses(processes) {
     const query = elements.processSearch.value.trim().toLowerCase();
-    const visible = query
+    const visible = (query
         ? processes.filter(
               (process) =>
                   process.name.toLowerCase().includes(query) || String(process.pid).includes(query),
           )
-        : processes;
+        : [...processes]
+    ).sort(compareProcesses);
 
     const body = document.createDocumentFragment();
 
@@ -318,6 +396,35 @@ async function pollProcesses() {
     } catch (error) {
         console.warn('process poll failed:', error.message);
     }
+}
+
+function applySort(key) {
+    if (sort.key === key) {
+        sort.ascending = !sort.ascending;
+    } else {
+        sort.key = key;
+        sort.ascending = key === 'name';  // names read best A-Z, numbers largest first
+    }
+
+    for (const header of elements.processHead.querySelectorAll('.sortable')) {
+        if (header.dataset.sortKey === key) {
+            header.setAttribute('aria-sort', sort.ascending ? 'ascending' : 'descending');
+        } else {
+            header.removeAttribute('aria-sort');
+        }
+    }
+    renderProcesses(latestProcesses);
+}
+
+for (const header of elements.processHead.querySelectorAll('.sortable')) {
+    header.tabIndex = 0;
+    header.addEventListener('click', () => applySort(header.dataset.sortKey));
+    header.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            applySort(header.dataset.sortKey);
+        }
+    });
 }
 
 elements.processSearch.addEventListener('input', () => renderProcesses(latestProcesses));

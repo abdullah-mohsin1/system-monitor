@@ -16,6 +16,9 @@
     </header>
 
     <dl class="meta">
+        <div><dt>Host</dt><dd id="metaHost">&mdash;</dd></div>
+        <div><dt>Kernel</dt><dd id="metaKernel">&mdash;</dd></div>
+        <div><dt>Arch</dt><dd id="metaArch">&mdash;</dd></div>
         <div><dt>Cores</dt><dd id="metaCores">&mdash;</dd></div>
         <div><dt>Uptime</dt><dd id="metaUptime">&mdash;</dd></div>
         <div><dt>Updated</dt><dd id="metaUpdated">&mdash;</dd></div>
@@ -42,6 +45,11 @@
         </article>
     </section>
 
+    <section class="panel" id="coresPanel" hidden>
+        <div class="panel-head"><h2>Per-core usage</h2></div>
+        <div class="cores" id="cores"></div>
+    </section>
+
     <section class="charts" id="charts">
         <article class="panel chart-panel">
             <div class="panel-head">
@@ -64,19 +72,21 @@
             <h2>Running processes</h2>
             <input type="search" id="processSearch" placeholder="Filter by name or PID" aria-label="Filter processes">
         </div>
-        <table class="processes">
-            <thead>
-                <tr>
-                    <th scope="col" class="num">PID</th>
-                    <th scope="col">Process</th>
-                    <th scope="col" class="num">CPU</th>
-                    <th scope="col" class="num">Memory</th>
-                </tr>
-            </thead>
-            <tbody id="processBody">
-                <tr class="empty"><td colspan="4">Loading processes</td></tr>
-            </tbody>
-        </table>
+        <div class="table-scroll">
+            <table class="processes">
+                <thead>
+                    <tr id="processHead">
+                        <th scope="col" class="num sortable" data-sort-key="pid">PID</th>
+                        <th scope="col" class="sortable" data-sort-key="name">Process</th>
+                        <th scope="col" class="num sortable" data-sort-key="cpuPercent" aria-sort="descending">CPU</th>
+                        <th scope="col" class="num sortable" data-sort-key="memoryBytes">Memory</th>
+                    </tr>
+                </thead>
+                <tbody id="processBody">
+                    <tr class="empty"><td colspan="4">Loading processes</td></tr>
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <!-- Charts are a nicety: if the CDN is unreachable the dashboard drops them

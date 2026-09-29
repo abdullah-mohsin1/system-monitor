@@ -12,6 +12,14 @@
 
 namespace sysmon {
 
+// Static facts about the machine, read once because they cannot change while
+// the server is running.
+struct HostInfo {
+    std::string hostname;
+    std::string kernelVersion;
+    std::string architecture;
+};
+
 // Parses /proc/uptime, whose first field is seconds since boot with two
 // decimals. Returns nullopt if the field is missing or negative.
 std::optional<double> parseUptimeSeconds(const std::string& contents);
@@ -21,6 +29,8 @@ std::optional<double> parseUptimeSeconds(const std::string& contents);
 // whole snapshot.
 class SystemMonitor {
 public:
+    SystemMonitor();
+
     struct Snapshot {
         std::optional<CpuStats> cpu;
         std::optional<MemoryStats> memory;
@@ -32,6 +42,7 @@ public:
     std::optional<MemoryStats> memory() const { return memoryMonitor_.sample(); }
     std::optional<DiskStats> disk() const { return diskMonitor_.sample(); }
     std::optional<double> uptimeSeconds() const;
+    const std::optional<HostInfo>& host() const { return host_; }
 
     std::optional<std::vector<ProcessInfo>> processes(size_t limit = ProcessMonitor::kDefaultLimit) {
         return processMonitor_.sample(limit);
@@ -46,6 +57,7 @@ private:
     MemoryMonitor memoryMonitor_;
     DiskMonitor diskMonitor_;
     ProcessMonitor processMonitor_;
+    std::optional<HostInfo> host_;
 };
 
 }  // namespace sysmon
